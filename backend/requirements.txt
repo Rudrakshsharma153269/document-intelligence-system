@@ -12,7 +12,6 @@ langchain-community==0.3.0
 langchain-core==0.3.0
 langchain-text-splitters==0.3.0
 faiss-cpu==1.13.0
-sentence-transformers==2.7.0
 huggingface-hub==0.28.1
 pypdf==5.0.1
 requests==2.32.3

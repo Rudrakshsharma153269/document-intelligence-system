@@ -9,18 +9,34 @@ from langchain.embeddings.base import Embeddings
 from pypdf import PdfReader
 
 
-class LocalEmbeddings(Embeddings):
-    """Local embeddings using sentence-transformers."""
+class HuggingFaceEmbeddings(Embeddings):
+    """Embeddings using HuggingFace Inference API."""
 
-    def __init__(self, model_name: str):
-        from sentence_transformers import SentenceTransformer
-        self.model = SentenceTransformer(model_name)
+    def __init__(self, api_key: str, model_name: str):
+        self.api_key = api_key
+        self.model_name = model_name
+
+    def _call_api(self, texts: List[str]) -> List[List[float]]:
+        response = requests.post(
+            f"https://router.huggingface.co/hf-inference/models/{self.model_name}/v1/embeddings",
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            json={"inputs": texts},
+            timeout=60
+        )
+        response.raise_for_status()
+        result = response.json()
+        if isinstance(result, list):
+            return result
+        return result.get("embeddings", result)
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return self.model.encode(texts, show_progress_bar=False).tolist()
+        results = []
+        for i in range(0, len(texts), 10):
+            results.extend(self._call_api(texts[i:i+10]))
+        return results
 
     def embed_query(self, text: str) -> List[float]:
-        return self.model.encode(text, show_progress_bar=False).tolist()
+        return self._call_api([text])[0]
 
 
 class RAGPipeline:
@@ -43,9 +59,12 @@ class RAGPipeline:
         os.makedirs(self.documents_path, exist_ok=True)
         os.makedirs(self.vector_store_path, exist_ok=True)
 
-        print("Loading local embeddings model...")
-        self.embeddings = LocalEmbeddings(model_name=embedding_model_name)
-        print("Embeddings model loaded!")
+        hf_api_key = os.getenv("HUGGINGFACE_API_KEY")
+        if not hf_api_key:
+            raise RuntimeError("HUGGINGFACE_API_KEY is required. Please set it in your .env file.")
+        print("Using HuggingFace embeddings API")
+        self.embeddings = HuggingFaceEmbeddings(api_key=hf_api_key, model_name=embedding_model_name)
+        print("Embeddings ready!")
 
         # Groq client for LLM
         self.groq_api_key = os.getenv("GROQ_API_KEY")
