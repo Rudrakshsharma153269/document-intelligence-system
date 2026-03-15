@@ -15,22 +15,27 @@ class HuggingFaceAPIEmbeddings(Embeddings):
     """Custom embeddings using HuggingFace InferenceClient."""
     
     def __init__(self, api_key: str, model_name: str):
-        from huggingface_hub import InferenceClient
-        self.client = InferenceClient(token=api_key)
+        self.api_key = api_key
         self.model_name = model_name
     
     def _call_api(self, text: str) -> List[float]:
         """Call the HuggingFace API and return embeddings."""
         try:
-            result = self.client.feature_extraction(text[:512], model=self.model_name, provider="hf-inference")
-            # Convert numpy array or similar to list
-            if hasattr(result, 'tolist'):
-                embedding = result.tolist()
-            elif isinstance(result, list):
-                embedding = result
-            else:
-                embedding = list(result)
-            return embedding
+            import requests
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            response = requests.post(
+                f"https://router.huggingface.co/pipeline/feature-extraction/{self.model_name}",
+                headers=headers,
+                json={"inputs": text[:512]},
+                timeout=30
+            )
+            response.raise_for_status()
+            result = response.json()
+            if isinstance(result, list):
+                # flatten if nested
+                if isinstance(result[0], list):
+                    result = result[0]
+            return result
         except Exception as e:
             raise Exception(f"HuggingFace API error: {str(e)}")
     
