@@ -8,52 +8,19 @@ from langchain_community.vectorstores import FAISS
 from langchain.embeddings.base import Embeddings
 from pypdf import PdfReader
 
-from huggingface_hub import InferenceClient
 
+class LocalEmbeddings(Embeddings):
+    """Local embeddings using sentence-transformers."""
 
-class HuggingFaceAPIEmbeddings(Embeddings):
-    """Custom embeddings using HuggingFace InferenceClient."""
-    
-    def __init__(self, api_key: str, model_name: str):
-        self.api_key = api_key
-        self.model_name = model_name
-    
-    def _call_api(self, text: str) -> List[float]:
-        """Call the HuggingFace API and return embeddings."""
-        try:
-            import requests
-            headers = {"Authorization": f"Bearer {self.api_key}"}
-            response = requests.post(
-                f"https://api-inference.huggingface.co/models/{self.model_name}",
-                headers=headers,
-                json={"inputs": text[:512], "options": {"wait_for_model": True}},
-                timeout=60
-            )
-            response.raise_for_status()
-            result = response.json()
-            if isinstance(result, list):
-                # flatten if nested
-                if isinstance(result[0], list):
-                    result = result[0]
-            return result
-        except Exception as e:
-            raise Exception(f"HuggingFace API error: {str(e)}")
-    
+    def __init__(self, model_name: str):
+        from sentence_transformers import SentenceTransformer
+        self.model = SentenceTransformer(model_name)
+
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed a list of documents."""
-        embeddings = []
-        total = len(texts)
-        for i, text in enumerate(texts):
-            if i % 10 == 0:
-                print(f"Embedding progress: {i}/{total}")
-            embedding = self._call_api(text)
-            embeddings.append(embedding)
-        print(f"Embedding complete: {total}/{total}")
-        return embeddings
-    
+        return self.model.encode(texts, show_progress_bar=False).tolist()
+
     def embed_query(self, text: str) -> List[float]:
-        """Embed a single query."""
-        return self._call_api(text)
+        return self.model.encode(text, show_progress_bar=False).tolist()
 
 
 class RAGPipeline:
@@ -76,24 +43,9 @@ class RAGPipeline:
         os.makedirs(self.documents_path, exist_ok=True)
         os.makedirs(self.vector_store_path, exist_ok=True)
 
-        # Embeddings: Use HuggingFace Inference API (no local Torch/DLLs needed)
-        hf_token = os.getenv("HUGGINGFACE_API_KEY")
-        if not hf_token:
-            raise RuntimeError(
-                "HUGGINGFACE_API_KEY is required. Please set it in your .env file."
-            )
-        print("Using HuggingFace Inference API embeddings")
-        self.embeddings = HuggingFaceAPIEmbeddings(
-            api_key=hf_token,
-            model_name=embedding_model_name,
-        )
-        
-        # Test the embeddings
-        try:
-            test_embedding = self.embeddings.embed_query("test")
-            print(f"Embeddings working! Dimension: {len(test_embedding)}")
-        except Exception as e:
-            print(f"Warning: Embeddings test failed: {e}")
+        print("Loading local embeddings model...")
+        self.embeddings = LocalEmbeddings(model_name=embedding_model_name)
+        print("Embeddings model loaded!")
 
         # Groq client for LLM
         self.groq_api_key = os.getenv("GROQ_API_KEY")
