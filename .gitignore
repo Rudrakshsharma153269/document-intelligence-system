@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# Node
+node_modules/
+
+# Database
+app.db
+
+# AI vector data
+vector_store/
+documents/
+
+# OS
+.DS_Store
