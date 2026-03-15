@@ -24,7 +24,7 @@ class HuggingFaceAPIEmbeddings(Embeddings):
             import requests
             headers = {"Authorization": f"Bearer {self.api_key}"}
             response = requests.post(
-                f"https://router.huggingface.co/pipeline/feature-extraction/{self.model_name}",
+                f"https://router.huggingface.co/hf-inference/pipeline/feature-extraction/{self.model_name}",
                 headers=headers,
                 json={"inputs": text[:512]},
                 timeout=30
