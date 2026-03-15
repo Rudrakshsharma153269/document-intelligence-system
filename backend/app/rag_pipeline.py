@@ -20,14 +20,12 @@ class HuggingFaceEmbeddings(Embeddings):
         response = requests.post(
             f"https://router.huggingface.co/hf-inference/models/{self.model_name}/v1/embeddings",
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
-            json={"inputs": texts},
+            json={"input": texts},
             timeout=60
         )
         response.raise_for_status()
         result = response.json()
-        if isinstance(result, list):
-            return result
-        return result.get("embeddings", result)
+        return [item["embedding"] for item in result["data"]]
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         results = []
@@ -52,7 +50,7 @@ class RAGPipeline:
 
     def __init__(self):
         embedding_model_name = os.getenv(
-            "EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2"
+            "EMBEDDING_MODEL_NAME", "BAAI/bge-small-en-v1.5"
         )
         self.documents_path = os.getenv("DOCUMENTS_PATH", "./documents")
         self.vector_store_path = os.getenv("VECTOR_STORE_PATH", "./vector_store")
