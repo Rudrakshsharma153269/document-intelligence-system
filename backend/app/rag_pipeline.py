@@ -22,7 +22,7 @@ class HuggingFaceAPIEmbeddings(Embeddings):
     def _call_api(self, text: str) -> List[float]:
         """Call the HuggingFace API and return embeddings."""
         try:
-            result = self.client.feature_extraction(text[:512], model=self.model_name)
+            result = self.client.feature_extraction(text[:512], model=self.model_name, provider="hf-inference")
             # Convert numpy array or similar to list
             if hasattr(result, 'tolist'):
                 embedding = result.tolist()
